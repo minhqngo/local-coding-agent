@@ -1,0 +1,41 @@
+name: patch_off_by_one
+description: >
+  binary_search in search.py has an off-by-one: it returns -1 for a value that
+  is present at the last index. Fix the loop bound so the test passes. Prefer a
+  small anchored patch over rewriting the file.
+
+setup:
+  files:
+    search.py: |
+      def binary_search(xs, target):
+          lo, hi = 0, len(xs) - 1
+          while lo < hi:
+              mid = (lo + hi) // 2
+              if xs[mid] == target:
+                  return mid
+              if xs[mid] < target:
+                  lo = mid + 1
+              else:
+                  hi = mid - 1
+          return -1
+    test_search.py: |
+      from search import binary_search
+
+      def test_last_element():
+          assert binary_search([1, 3, 5, 7, 9], 9) == 4
+
+      def test_present():
+          assert binary_search([1, 3, 5, 7, 9], 5) == 2
+
+      def test_absent():
+          assert binary_search([1, 3, 5, 7, 9], 4) == -1
+
+verify:
+  test_command: "python -m pytest -q"
+
+# Exercises the anchored patch_file path (P3) end-to-end in mock mode.
+mock_actions:
+  - action: patch_file
+    path: search.py
+    old_text: "    while lo < hi:"
+    new_text: "    while lo <= hi:"

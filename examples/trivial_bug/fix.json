@@ -1,0 +1,7 @@
+[
+  {
+    "action": "write_file",
+    "path": "calc.py",
+    "content": "def safe_divide(a, b):\n    if b == 0:\n        return 0.0\n    return a / b\n"
+  }
+]

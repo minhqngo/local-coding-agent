@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "local-coding-agent"
+version = "0.1.0"
+description = "A multi-model coding agent built from small open-weight models (Qwen + Liquid LFM2)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "requests>=2.28",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+# train_lfm2.py targets the current TRL API (SFTConfig / processing_class).
+finetune = ["trl>=0.13", "datasets", "transformers", "accelerate"]
+
+[project.scripts]
+coding-agent = "coding_agent.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

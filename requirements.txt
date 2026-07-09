@@ -1,0 +1,12 @@
+# Runtime dependencies for the local multi-model coding agent.
+# --mock mode needs no network stack (requests is imported lazily), but PyYAML
+# is required to load config, so the test suite needs PyYAML + Python 3.10+.
+# pytest is NOT required to run the unittest suite.
+
+requests>=2.28      # OpenAI-compatible HTTP calls to llama-server / Ollama
+PyYAML>=6.0         # config/models.yaml parsing (required)
+
+# --- optional extras (Phase 4 retrieval / Phase 5 fine-tuning) ---
+# numpy>=1.24       # denser offline embedding fallback (agent ships a pure-python one)
+# Fine-tuning (finetune/) is documented but intentionally left as an opt-in extra:
+#   pip install "unsloth"  trl  datasets  transformers  accelerate

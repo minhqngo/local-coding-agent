@@ -1,0 +1,16 @@
+# Base image for the docker sandbox backend.
+#
+# The docker backend runs with `--network none`, so anything the agent's test
+# command needs must be baked in here (pip can't reach an index at run time).
+# Add your project's own test dependencies below.
+#
+# Build:  docker build -f scripts/Dockerfile.sandbox -t coding-agent-sandbox:latest .
+# Then set sandbox.docker_image: coding-agent-sandbox:latest and backend: docker.
+FROM python:3.12-slim
+
+RUN pip install --no-cache-dir pytest
+
+# --- add your project's test/runtime deps here ---
+# RUN pip install --no-cache-dir numpy requests ...
+
+WORKDIR /workspace

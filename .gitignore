@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.env
+
+# Downloaded model weights — never commit GGUFs
+models/
+*.gguf
+
+# Agent run artifacts
+runs/
+*.log
+.index/
+.coding-agent/

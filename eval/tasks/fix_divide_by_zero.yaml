@@ -1,0 +1,33 @@
+name: fix_divide_by_zero
+description: >
+  The function `safe_divide` in calc.py must return 0.0 when the divisor is 0
+  instead of raising ZeroDivisionError. Fix it so the tests pass.
+
+# Files materialised into a fresh temp workdir before the run.
+setup:
+  files:
+    calc.py: |
+      def safe_divide(a, b):
+          return a / b
+    test_calc.py: |
+      from calc import safe_divide
+
+      def test_normal():
+          assert safe_divide(10, 2) == 5
+
+      def test_zero_divisor():
+          assert safe_divide(1, 0) == 0.0
+
+# How the eval confirms success, independent of what the agent claims.
+verify:
+  test_command: "python -m pytest -q"
+
+# Deterministic fix used when the eval runs in --mock mode (offline).
+mock_actions:
+  - action: write_file
+    path: calc.py
+    content: |
+      def safe_divide(a, b):
+          if b == 0:
+              return 0.0
+          return a / b
