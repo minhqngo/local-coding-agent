@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from functools import cached_property
+
 from .config import Config
-from .llm import LLMClient, Responder, make_client
+from .llm import LLMClient, Responder, TraceSink, make_client
 from .roles import Coder, Dispatcher, Extractor, Planner, RepoQA
 
 
@@ -11,11 +13,17 @@ class ModelRegistry:
     """Owns the per-role clients and exposes ready-to-use role wrappers.
 
     In real mode each role gets an :class:`OpenAICompatClient` pointed at its
-    own port. In mock mode every role shares one ``responder`` (typically a
+    server (roles that ``share`` a model point at the same server). In mock mode
+    every role shares one ``responder`` (typically a
     :class:`~coding_agent.mock_brain.MockBrain`).
     """
 
-    def __init__(self, config: Config, responder: Responder | None = None):
+    def __init__(
+        self,
+        config: Config,
+        responder: Responder | None = None,
+        tracer: TraceSink | None = None,
+    ):
         self.config = config
         self.mock = config.mock
         if self.mock and responder is None:
@@ -24,34 +32,35 @@ class ModelRegistry:
                 "pass one to ModelRegistry(...)."
             )
         self._responder = responder
+        self.tracer = tracer
         self._clients: dict[str, LLMClient] = {}
 
     def client(self, role: str) -> LLMClient:
         if role not in self._clients:
             role_cfg = self.config.role(role)
             self._clients[role] = make_client(
-                role_cfg, mock=self.mock, responder=self._responder
+                role_cfg, mock=self.mock, responder=self._responder, tracer=self.tracer
             )
         return self._clients[role]
 
-    # Convenience accessors — lazily constructed role wrappers.
-    @property
+    # Role wrappers are created once and reused (tests may monkeypatch them).
+    @cached_property
     def planner(self) -> Planner:
         return Planner(self.client("planner"))
 
-    @property
+    @cached_property
     def coder(self) -> Coder:
         return Coder(self.client("coder"))
 
-    @property
+    @cached_property
     def dispatcher(self) -> Dispatcher:
         return Dispatcher(self.client("dispatcher"))
 
-    @property
+    @cached_property
     def extractor(self) -> Extractor:
         return Extractor(self.client("extractor"))
 
-    @property
+    @cached_property
     def rag(self) -> RepoQA:
         return RepoQA(self.client("rag"))
 

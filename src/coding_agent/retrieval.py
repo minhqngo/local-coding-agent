@@ -1,17 +1,18 @@
-"""Phase 4 — repo awareness.
+"""Repo awareness: find the few chunks of code relevant to a question.
 
 Chunk the codebase, index the chunks, and answer ``search_codebase`` queries by
-returning the most relevant chunks. The RAG role (MiniCPM5-1B — see REVIEW.md §4)
-then answers questions over those chunks so the planner asks questions instead of
-dumping whole files into its small context window.
+returning the most relevant chunks. The RAG role then answers questions over
+those chunks, so the planner asks questions instead of dumping whole files into
+its small context window.
 
 Two ranking modes:
 
-* **TF-IDF (default)** — dependency-free cosine ranker; works offline and in
-  tests.
-* **Dense** — pass ``embed_fn`` (e.g. an LFM2-ColBERT-350M / MiniCPM-Embedding
-  endpoint returning a vector for a string) and the same API ranks by dense
-  cosine instead. This is the real hook the README points at.
+* **TF-IDF (default)** — dependency-free cosine ranker over identifier tokens;
+  works offline and in tests. Read :meth:`Retriever.search` — it is ~20 lines.
+* **Dense** — pass ``embed_fn`` (any function returning a vector for a string,
+  e.g. a call to an embedding endpoint) and the same API ranks by dense cosine
+  instead. Not wired to a served model by default: single-vector embeddings
+  need an embedding model served with ``llama-server --embedding``.
 
 The built index is persisted under ``config.index_dir`` keyed by a signature of
 the indexed files (path + size + mtime); an unchanged repo reloads instantly
@@ -118,7 +119,7 @@ class Retriever:
         step = max(1, self.config.chunk_lines - self.config.chunk_overlap)
         for path in files:
             try:
-                lines = path.read_text(errors="replace").splitlines()
+                lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
             except OSError:
                 continue
             rel = str(path.relative_to(self.workdir))
@@ -174,7 +175,7 @@ class Retriever:
                     for c in self.chunks
                 ],
             }
-            path.write_text(json.dumps(payload))
+            path.write_text(json.dumps(payload), encoding="utf-8")
         except OSError:
             pass  # a read-only workdir just means we rebuild next time
 
@@ -183,7 +184,7 @@ class Retriever:
         if not path.exists():
             return False
         try:
-            payload = json.loads(path.read_text())
+            payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return False
         if payload.get("signature") != signature or payload.get("dense") != self.dense:

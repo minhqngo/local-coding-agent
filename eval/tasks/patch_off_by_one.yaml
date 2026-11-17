@@ -33,7 +33,7 @@ setup:
 verify:
   test_command: "python -m pytest -q"
 
-# Exercises the anchored patch_file path (P3) end-to-end in mock mode.
+# Exercises the anchored patch_file path end-to-end in mock mode.
 mock_actions:
   - action: patch_file
     path: search.py

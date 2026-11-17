@@ -1,4 +1,4 @@
-"""P5 workspace snapshot + P6 session persistence/resume."""
+"""Workspace snapshot + session persistence/resume."""
 
 import subprocess
 import tempfile

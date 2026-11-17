@@ -13,7 +13,7 @@ rest of the repo/tests never require a training stack.
         --out out/extractor-lora
 
 After training, export to GGUF (llama.cpp `convert_hf_to_gguf.py` + `quantize`)
-and point the role's `gguf` in config/models.yaml at the result.
+and point the role's `gguf` in config/profiles/<profile>.yaml at the result.
 """
 
 from __future__ import annotations

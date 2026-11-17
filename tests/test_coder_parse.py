@@ -1,4 +1,4 @@
-"""P2 hybrid JSON-header + XML-body coder response parser."""
+"""The hybrid JSON-header + raw-tag coder response parser."""
 
 import unittest
 

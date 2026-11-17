@@ -78,12 +78,28 @@ class ToolsSandboxTest(unittest.TestCase):
         with self.assertRaises(ToolError) as cm:
             execute_tool(self.ctx, "patch_file", {"path": "m.py", "old_text": "NOPE", "new_text": "y"})
         self.assertIn("found 0", str(cm.exception))
+        # The current content is in the error, so the next try can copy it.
+        self.assertIn("Current content of m.py:\nx = 1", str(cm.exception))
+
+    def test_edit_that_breaks_python_is_rejected(self):
+        execute_tool(self.ctx, "write_file", {"path": "c.py", "content": "def f(a, b):\n    return a / b\n"})
+        with self.assertRaises(ToolError) as cm:
+            # The exact one-line patch a 3B model produced in a real trace.
+            execute_tool(self.ctx, "patch_file", {"path": "c.py", "old_text": "def f(a, b):",
+                                                  "new_text": "def f(a, b): if b == 0:"})
+        self.assertIn("NOT changed", str(cm.exception))
+        self.assertIn("line 1", str(cm.exception))
+        self.assertEqual((self.workdir / "c.py").read_text(), "def f(a, b):\n    return a / b\n")
+        with self.assertRaises(ToolError):
+            execute_tool(self.ctx, "write_file", {"path": "c.py", "content": "def f(:\n"})
+        # Non-Python files are not checked.
+        execute_tool(self.ctx, "write_file", {"path": "notes.txt", "content": "def f(:\n"})
 
     def test_patch_file_multi_match_refused(self):
         execute_tool(self.ctx, "write_file", {"path": "m.py", "content": "x=1\nx=1\n"})
         with self.assertRaises(ToolError) as cm:
             execute_tool(self.ctx, "patch_file", {"path": "m.py", "old_text": "x=1", "new_text": "x=2"})
-        self.assertIn("found 2", str(cm.exception))
+        self.assertIn("2 times", str(cm.exception))
 
 
 if __name__ == "__main__":

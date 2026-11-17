@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "local-coding-agent"
-version = "0.1.0"
-description = "A multi-model coding agent built from small open-weight models (Qwen + Liquid LFM2)."
+version = "0.2.0"
+description = "A small local coding agent built to be read: single- and multi-model agents on one harness."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

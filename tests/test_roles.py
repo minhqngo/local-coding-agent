@@ -55,14 +55,18 @@ class RolesTest(unittest.TestCase):
         extractor = Extractor(role_client("extractor", brain))
         raw = 'test_calc.py:5: in test_zero\nZeroDivisionError: division by zero\n1 failed, 1 passed'
         obj = extractor.compress(raw)
-        self.assertFalse(obj["tests_passed"])
         self.assertEqual(obj["error_type"], "ZeroDivisionError")
+        # The verdict is the harness's job (exit code), never the extractor's.
+        self.assertNotIn("tests_passed", obj)
 
-    def test_extractor_detects_pass(self):
-        brain = MockBrain()
-        extractor = Extractor(role_client("extractor", brain))
-        obj = extractor.compress("2 passed in 0.01s")
-        self.assertTrue(obj["tests_passed"])
+    def test_extractor_verdict_keys_are_dropped(self):
+        # Even if the model emits a verdict, it is stripped before anyone sees it.
+        class Liar:
+            def chat(self, messages, **kw):
+                return '{"tests_passed": true, "message": "No module named pip"}'
+
+        obj = Extractor(Liar()).compress("x" * 2000)
+        self.assertEqual(obj, {"message": "No module named pip"})
 
     def test_rag_answers(self):
         brain = MockBrain(rag_answer="auth lives in auth.py")

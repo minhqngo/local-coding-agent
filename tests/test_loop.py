@@ -51,7 +51,7 @@ class LoopTest(unittest.TestCase):
         self.assertIn("coder", actors)
 
     def test_dispatch_all_routes_through_dispatcher(self):
-        # D2: with dispatch_all, even the planner's test-run goes through the
+        # With dispatch_all, even the planner's test-run goes through the
         # LFM2 dispatcher and still completes end-to-end.
         workdir = self._workdir()
         config = load_config(mock=True)
@@ -86,16 +86,16 @@ class LoopTest(unittest.TestCase):
         return AgentLoop(config, reg, ctx), workdir
 
     def test_exact_test_command_gate(self):
-        # B1: only the EXACT configured command may satisfy the finish gate.
+        # Only the EXACT configured command may satisfy the finish gate.
         config = load_config(mock=True)
         config.loop.test_command = "python -m pytest -q"
         loop, _ = self._bare_loop(config)
-        self.assertTrue(loop._is_exact_test_command("python -m pytest -q"))
-        self.assertFalse(loop._is_exact_test_command("python -m pytest -q tests/test_one.py"))
-        self.assertFalse(loop._is_exact_test_command("python -m pytest -q -k foo"))
+        self.assertTrue(loop.harness.is_test_command("python -m pytest -q"))
+        self.assertFalse(loop.harness.is_test_command("python -m pytest -q tests/test_one.py"))
+        self.assertFalse(loop.harness.is_test_command("python -m pytest -q -k foo"))
 
     def test_mutating_tool_resets_tests_passed(self):
-        # B2: a write after a green run invalidates the pass.
+        # A write after a green run invalidates the pass.
         config = load_config(mock=True)
         loop, _ = self._bare_loop(config)
         loop.tests_passed = True
@@ -103,7 +103,7 @@ class LoopTest(unittest.TestCase):
         self.assertFalse(loop.tests_passed)
 
     def test_patch_file_resets_tests_passed(self):
-        # P3/B2: a patch is mutating and invalidates a prior pass.
+        # A patch is mutating and invalidates a prior pass.
         config = load_config(mock=True)
         loop, workdir = self._bare_loop(config)
         (workdir / "m.py").write_text("a = 1\n")
@@ -112,7 +112,7 @@ class LoopTest(unittest.TestCase):
         self.assertFalse(loop.tests_passed)
 
     def test_confirm_not_prompted_on_invalid_call(self):
-        # P7.1: --confirm must not prompt for a call that would fail validation.
+        # --confirm must not prompt for a call that would fail validation.
         config = load_config(mock=True)
         prompts = []
         d = self._workdir()
@@ -125,17 +125,18 @@ class LoopTest(unittest.TestCase):
         self.assertEqual(prompts, ["write_file"])
 
     def test_write_invalidates_stale_read_in_coder_context(self):
-        # P7.3: a write drops the pre-write read of that path from raw_context.
+        # A write drops the pre-write read of that path from the coder's memory,
+        # so the next patch isn't based on stale text.
         config = load_config(mock=True)
         loop, workdir = self._bare_loop(config)
         (workdir / "a.py").write_text("x = 1\n")
         loop._execute(ToolCall("read_file", {"path": "a.py"}))
-        self.assertTrue(any(r.startswith("FILE a.py:") for r in loop.raw_context))
+        self.assertIn("FILE a.py:", loop.coder_memory.render())
         loop._execute(ToolCall("write_file", {"path": "a.py", "content": "x = 2\n"}))
-        self.assertFalse(any(r.startswith("FILE a.py:") for r in loop.raw_context))
+        self.assertNotIn("FILE a.py:", loop.coder_memory.render())
 
     def test_resume_continues_run(self):
-        # P6: a bounded run persists; resume with a bigger budget finishes.
+        # A bounded run persists; resume with a bigger budget finishes.
         workdir = self._workdir()
         config = load_config(mock=True)
         config.loop.test_command = CHECK_CMD
@@ -181,6 +182,8 @@ class LoopTest(unittest.TestCase):
         result = loop.run("pretend it's done")
         self.assertFalse(result.success)
         self.assertFalse(result.tests_passed)
+        # The forced planner really was used, and the gate ran each time.
+        self.assertEqual([e.actor for e in result.transcript].count("gate"), 2)
 
 
 if __name__ == "__main__":

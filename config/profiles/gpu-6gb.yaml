@@ -1,0 +1,71 @@
+# Profile: 6 GB GPU + 16 GB RAM — e.g. a GTX 1660 Ti laptop. The default.
+#
+# Same team, fewer servers. Two ideas make it fit:
+#
+#   1. Roles can SHARE a model. `share: planner` means "send my prompts to the
+#      planner's server" — the role keeps its own prompt, temperature and token
+#      limit, but no second model is loaded. Here rag and dispatcher share the
+#      planner, so 5 roles need only 3 servers.
+#   2. Smaller context windows. The KV cache grows linearly with `ctx`; 8K
+#      tokens is plenty for single-file tasks and halves the cache vs 16K.
+#
+# Estimated VRAM (run `coding-agent doctor` for live numbers): ~4.5 GB of 6 GB.
+# On a CPU-only machine, start the servers with `coding-agent serve start --cpu`
+# (expect roughly 30 tok/s for the coder on a modern 8-core laptop CPU).
+#
+# Select it with:  --profile gpu-6gb   or   set CODING_AGENT_PROFILE=gpu-6gb
+
+defaults:
+  base_url_template: "http://127.0.0.1:{port}/v1"
+  timeout_s: 300
+  max_tokens: 2048
+
+server:
+  models_dir: "models"
+  host: "127.0.0.1"
+
+roles:
+  coder:
+    model: "Qwen2.5-Coder-3B-Instruct"
+    port: 8002
+    gguf: "qwen2.5-coder-3b-instruct-q4_k_m.gguf"
+    hf_repo: "Qwen/Qwen2.5-Coder-3B-Instruct-GGUF"
+    gpu_layers: 99
+    ctx: 8192
+    temperature: 0.2
+    max_tokens: 2048
+
+  # Thinking off: it multiplies the tokens per decision by 5-10x, and on a
+  # smaller GPU (or CPU) that is the difference between 3 s and 30 s per turn.
+  planner:
+    model: "Qwen3.5-2B"
+    port: 8001
+    gguf: "Qwen3.5-2B-Q5_K_M.gguf"
+    hf_repo: "unsloth/Qwen3.5-2B-GGUF"
+    gpu_layers: 99
+    ctx: 8192
+    temperature: 0.6
+    thinking: false
+    max_tokens: 1024
+
+  rag:
+    share: planner
+    thinking: false
+    temperature: 0.3
+    max_tokens: 1024
+
+  dispatcher:
+    share: planner
+    thinking: false
+    temperature: 0.0
+    max_tokens: 512
+
+  extractor:
+    model: "LFM2-350M-Extract"
+    port: 8004
+    gguf: "LFM2-350M-Extract-Q8_0.gguf"
+    hf_repo: "LiquidAI/LFM2-350M-Extract-GGUF"
+    gpu_layers: 0
+    ctx: 8192
+    temperature: 0.0
+    max_tokens: 512

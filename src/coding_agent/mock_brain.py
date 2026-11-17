@@ -37,12 +37,12 @@ class MockBrain:
     test_command: str = "python -m pytest -q"
     # Canned RAG answer (tests can override).
     rag_answer: str = "Based on the retrieved chunks, the relevant logic lives in the cited files."
-    # When True, the coder drives the whole loop itself (Phase-2 baseline):
+    # When True, the coder drives the whole loop itself (single-model agent):
     # scripted edits → run the test command → finish.
     single_model: bool = False
 
     _coder_idx: int = 0
-    _baseline_tested: bool = False
+    _single_tested: bool = False
 
     # -- public: the Responder signature the clients call -------------------- #
     def __call__(self, role: str, messages: list[Message]) -> str:
@@ -97,7 +97,7 @@ class MockBrain:
     # -- coder --------------------------------------------------------------- #
     def _coder(self, messages: list[Message]) -> str:
         if self.single_model:
-            return self._baseline_coder()
+            return self._single_model_coder()
         if self._coder_idx < len(self.coder_actions):
             action = dict(self.coder_actions[self._coder_idx])
             self._coder_idx += 1
@@ -109,8 +109,8 @@ class MockBrain:
             {"rationale": "No scripted action; inspect the repo.", "action": "read_file", "path": "."}
         )
 
-    def _baseline_coder(self) -> str:
-        """Coder-only baseline: scripted edits → run tests → finish."""
+    def _single_model_coder(self) -> str:
+        """Single-model agent: scripted edits → run tests → finish."""
 
         if self._coder_idx < len(self.coder_actions):
             action = dict(self.coder_actions[self._coder_idx])
@@ -118,8 +118,8 @@ class MockBrain:
             action.setdefault("rationale", "Apply the scripted fix.")
             action.pop("instruction", None)
             return json.dumps(action)
-        if not self._baseline_tested:
-            self._baseline_tested = True
+        if not self._single_tested:
+            self._single_tested = True
             return json.dumps(
                 {"rationale": "Verify the fix.", "action": "run_shell", "command": self.test_command}
             )

@@ -1,4 +1,4 @@
-"""P1 malformed-output recovery + P4 repeated-call breaker."""
+"""Malformed-output recovery and the repeated-call breaker."""
 
 import tempfile
 import unittest
@@ -21,7 +21,7 @@ def _loop(config, responder):
 
 class RecoveryTest(unittest.TestCase):
     def test_planner_garbage_then_valid_recovers(self):
-        # P1: 3 malformed planner responses, then a valid finish — must succeed
+        # 3 malformed planner responses, then a valid finish — must succeed
         # without consuming the (max_turns) step budget on the garbage.
         class Flaky:
             def __init__(self):
@@ -44,7 +44,7 @@ class RecoveryTest(unittest.TestCase):
         self.assertTrue(result.success)
 
     def test_garbage_only_exhausts_attempts_not_turns(self):
-        # P1: never-valid planner → distinct "malformed" failure, not turn-limit.
+        # never-valid planner → distinct "malformed" failure, not turn-limit.
         class Garbage:
             def __call__(self, role, messages):
                 return "not json" if role == "planner" else "{}"
@@ -56,7 +56,7 @@ class RecoveryTest(unittest.TestCase):
         self.assertIn("malformed", result.summary)
 
     def test_extractor_garbage_does_not_abort(self):
-        # P1: a garbled extractor degrades to a raw-fallback dict, never raises.
+        # a garbled extractor degrades to a raw-fallback dict, never raises.
         class BadExtractor:
             def chat(self, messages, **kw):
                 return "<<<not json>>>"
@@ -66,20 +66,21 @@ class RecoveryTest(unittest.TestCase):
         self.assertIn("message", obj)
 
     def test_repeated_call_breaker(self):
-        # P4: third identical non-test call refused; test command exempt.
+        # third identical non-test call refused; test command exempt.
         config = load_config(mock=True)
         loop = _loop(config, lambda r, m: "{}")
         call = ToolCall("run_shell", {"command": "echo hi"})
         loop._execute(call)
         loop._execute(call)
-        raw, _ = loop._execute(call)
-        self.assertIn("REFUSED: repeated", raw)
+        res = loop._execute(call)
+        self.assertIn("REFUSED: repeated", res.output)
+        self.assertEqual(res.blocked, "repeated identical call")
 
         test_call = ToolCall("run_shell", {"command": config.loop.test_command})
         loop._execute(test_call)
         loop._execute(test_call)
-        raw2, _ = loop._execute(test_call)
-        self.assertNotIn("REFUSED", raw2)
+        res2 = loop._execute(test_call)
+        self.assertNotIn("REFUSED", res2.output)
 
 
 if __name__ == "__main__":

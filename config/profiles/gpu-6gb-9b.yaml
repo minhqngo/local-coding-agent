@@ -1,0 +1,72 @@
+# Profile: 6 GB GPU + 16 GB RAM, one 9B model squeezed onto the GPU.
+#
+# EXPERIMENTAL — picked from a model survey on 2026-11-17 (see
+# docs/running-locally.md#choosing-models). The GGUF file was verified on
+# Hugging Face; this profile has not been benchmarked on a GTX 1660 Ti yet.
+# First run:  coding-agent download --profile gpu-6gb-9b        (5.2 GB)
+#             coding-agent doctor   --profile gpu-6gb-9b
+#
+# Ornith-1.5-9B is a coding fine-tune of Qwen3.5-9B (MIT license); its card
+# reports SWE-bench Verified 70.6 (self-reported, not independently verified:
+# https://huggingface.co/ornith-ai/Ornith-1.5-9B-GGUF). Even if the real number
+# is much lower, a 9B model is a big step up from a 3B coder.
+#
+# How it fits in 6 GB: IQ4_XS quantization (5.2 GB file ≈ 4.9 GiB), only 8 of
+# its 32 layers keep a KV cache (Qwen3.5 hybrid attention), the KV cache is
+# stored as q8_0 instead of f16 (-ctk/-ctv, needs flash attention), and every
+# role shares the one GPU model. If it still runs out of memory, switch `gguf`
+# to Ornith-1.5-9B-IQ3_M.gguf (4.7 GB) or lower `ctx`.
+#
+# Best used as a single model:  coding-agent run "..." --single-model
+
+defaults:
+  base_url_template: "http://127.0.0.1:{port}/v1"
+  timeout_s: 300
+  max_tokens: 2048
+
+server:
+  models_dir: "models"
+  host: "127.0.0.1"
+
+roles:
+  coder:
+    model: "Ornith-1.5-9B"
+    port: 8002
+    gguf: "Ornith-1.5-9B-IQ4_XS.gguf"
+    hf_repo: "bartowski/Ornith-1.5-9B-GGUF"
+    gpu_layers: 99
+    ctx: 8192
+    server_args: ["-fa", "on", "-ctk", "q8_0", "-ctv", "q8_0"]
+    temperature: 0.2
+    max_tokens: 2048
+    thinking: false
+
+  planner:
+    share: coder
+    temperature: 0.6
+    thinking: false
+    max_tokens: 1024
+
+  rag:
+    share: coder
+    temperature: 0.3
+    thinking: false
+    max_tokens: 1024
+
+  dispatcher:
+    share: coder
+    temperature: 0.0
+    thinking: false
+    max_tokens: 512
+
+  # The one model that stays separate: 350M, on the CPU, ~130 tok/s, no VRAM.
+  # (LFM license: free for personal use and companies under $10M revenue.)
+  extractor:
+    model: "LFM2-350M-Extract"
+    port: 8004
+    gguf: "LFM2-350M-Extract-Q8_0.gguf"
+    hf_repo: "LiquidAI/LFM2-350M-Extract-GGUF"
+    gpu_layers: 0
+    ctx: 8192
+    temperature: 0.0
+    max_tokens: 512

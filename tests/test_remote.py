@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from coding_agent.config import load_config
-from coding_agent.llm import ChatError, OpenAICompatClient
+from coding_agent.llm import ModelUnavailable, OpenAICompatClient
 
 
 class _FakeOpenAIHandler(BaseHTTPRequestHandler):
@@ -62,17 +62,20 @@ class RemoteClientTest(unittest.TestCase):
         out = client.chat([{"role": "user", "content": "ping"}])
         self.assertEqual(out, "echo:test-model:ping")
 
-    def test_unreachable_host_raises_chaterror(self):
-        # A dead endpoint must surface as ChatError (which the loop's P1
-        # recovery absorbs), never as a raw exception.
+    def test_unreachable_host_raises_model_unavailable(self):
+        # A dead endpoint is NOT a malformed answer: it must surface as
+        # ModelUnavailable (the loop stops) rather than ChatError (the loop
+        # would politely retry a dead server dozens of times).
         client = OpenAICompatClient(
             role="coder",
             base_url="http://127.0.0.1:1/v1",  # port 1: nothing listens
             model="m",
             timeout_s=2,
+            connect_retries=0,
         )
-        with self.assertRaises(ChatError):
+        with self.assertRaises(ModelUnavailable) as cm:
             client.chat([{"role": "user", "content": "x"}])
+        self.assertIn("serve status", str(cm.exception))
 
 
 class RemoteConfigTest(unittest.TestCase):
@@ -80,7 +83,7 @@ class RemoteConfigTest(unittest.TestCase):
 
     def _write_config(self, body: str) -> str:
         path = Path(tempfile.mkdtemp()) / "models.yaml"
-        path.write_text(body)
+        path.write_text(body, encoding="utf-8")
         return str(path)
 
     def test_base_url_template_points_all_roles_remote(self):

@@ -1,0 +1,57 @@
+# How the agent BEHAVES — the same on every machine.
+#
+# Which models run, and where (GPU/CPU, ports, context sizes), lives in a
+# hardware profile under config/profiles/. A profile is merged on top of this
+# file, so a profile may also override anything here.
+
+sandbox:
+  # "subprocess" runs commands directly in the repo directory (fast, but NOT a
+  # security boundary). "docker" runs them in a --network none container —
+  # use it for code you don't trust (see scripts/build_sandbox_image.sh).
+  backend: "subprocess"
+  docker_image: "python:3.12-slim"
+  # A test suite that hangs (an agent-written infinite loop) is killed after this.
+  command_timeout_s: 60
+  # Best-effort refusal list, matched on the command NAME (so `grep shutdown`
+  # is fine but `shutdown now` is refused). A convenience, not a security layer.
+  denylist:
+    - "rm -rf /"
+    - ":(){ :|:& };:"
+    - "mkfs"
+    - "dd if="
+    - "shutdown"
+    - "reboot"
+    # File deletion. Fixing code never requires deleting files, and a confused
+    # small model once ran `del calc.py` on the very file it was fixing.
+    # Remove these if your tasks genuinely need to delete things.
+    - "rm"
+    - "del"
+    - "erase"
+    - "rmdir"
+    - "rd"
+    - "Remove-Item"
+
+loop:
+  max_turns: 25
+  # The run may only report success after this EXACT command exited 0, and any
+  # file edit afterwards invalidates that pass. The command runs with the
+  # project's own virtualenv (.venv/ or venv/) when it has one.
+  require_passing_tests: true
+  test_command: "python -m pytest -q"
+  # Stop early when the agent keeps getting the identical result (same output,
+  # same exit code) this many times within the last few steps. 0 disables.
+  max_repeated_outcomes: 5
+  # Run the test command automatically after every successful edit and show
+  # the result in the same step. Turn off if your test suite is slow.
+  test_after_edit: true
+  # Route every tool call through the dispatcher model instead of mapping clean
+  # coder actions deterministically. Slower; useful for experiments.
+  dispatch_all: false
+
+retrieval:
+  chunk_lines: 60
+  chunk_overlap: 10
+  top_k: 6
+  index_dir: ".index"
+  include_globs: ["**/*.py", "**/*.md", "**/*.txt", "**/*.toml", "**/*.yaml", "**/*.yml"]
+  exclude_dirs: [".git", "__pycache__", "node_modules", ".venv", "venv", "models", ".index", ".coding-agent"]

@@ -1,0 +1,88 @@
+# Profile: 12 GB GPU — e.g. an RTX PRO 3000 / RTX 4070-class laptop.
+#
+# The full specialist team. The three generators (coder, planner, rag) live on
+# the GPU; the two small "glue" models run on the CPU, where they are already
+# fast (LFM2-350M does ~130 tok/s on a laptop CPU) and cost no VRAM.
+#
+# Estimated VRAM (run `coding-agent doctor` for live numbers): ~8 GB of 12 GB.
+# Measured on an RTX PRO 3000 Laptop (12 GB): coder 87 tok/s, planner 112 tok/s.
+#
+# Select it with:  --profile gpu-12gb   or   set CODING_AGENT_PROFILE=gpu-12gb
+#
+# License note: the LFM models (dispatcher, extractor) are under Liquid's LFM
+# Open License, which only permits commercial use by organisations under $10M
+# annual revenue. Fine for personal projects; for work at a larger company use
+# gpu-12gb-moe (all Apache-2.0) or point these roles at another model.
+# A stronger, experimental alternative for 12 GB + lots of RAM: gpu-12gb-moe.
+
+defaults:
+  base_url_template: "http://127.0.0.1:{port}/v1"
+  timeout_s: 180
+  max_tokens: 2048
+
+server:
+  models_dir: "models"     # relative to the repo root
+  host: "127.0.0.1"        # 0.0.0.0 to serve another machine (no auth! see docs)
+
+roles:
+  # Writes code. The only 3B model in the fleet.
+  coder:
+    model: "Qwen2.5-Coder-3B-Instruct"
+    port: 8002
+    gguf: "qwen2.5-coder-3b-instruct-q4_k_m.gguf"
+    hf_repo: "Qwen/Qwen2.5-Coder-3B-Instruct-GGUF"
+    gpu_layers: 99          # 99 = every layer on the GPU, 0 = CPU only
+    ctx: 16384              # served context window (tokens)
+    temperature: 0.2
+    max_tokens: 2048
+    # Speculative decoding: a tiny same-family model drafts tokens, the 3B
+    # model verifies them in one pass. Same output, usually faster.
+    draft_gguf: "qwen2.5-coder-0.5b-instruct-q8_0.gguf"
+    draft_hf_repo: "Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF"
+
+  # Orchestrates; never writes code. Thinking mode on: at ~110 tok/s a few
+  # hundred reasoning tokens cost a few seconds.
+  planner:
+    model: "Qwen3.5-2B"
+    port: 8001
+    gguf: "Qwen3.5-2B-Q5_K_M.gguf"
+    hf_repo: "unsloth/Qwen3.5-2B-GGUF"
+    gpu_layers: 99
+    ctx: 16384
+    temperature: 0.6
+    thinking: true
+    max_tokens: 4096        # thinking tokens count against this budget
+
+  # Answers questions about the repo from retrieved chunks.
+  rag:
+    model: "MiniCPM5-1B"
+    port: 8005
+    gguf: "MiniCPM5-1B-Q8_0.gguf"
+    hf_repo: "openbmb/MiniCPM5-1B-GGUF"
+    gpu_layers: 99
+    ctx: 16384
+    temperature: 0.3
+    max_tokens: 1024
+
+  # Turns a messy intent into an exact tool call. Only used for coder actions
+  # that can't be mapped deterministically, or with --dispatch-all.
+  dispatcher:
+    model: "LFM2-1.2B-Tool"
+    port: 8003
+    gguf: "LFM2-1.2B-Tool-Q8_0.gguf"
+    hf_repo: "LiquidAI/LFM2-1.2B-Tool-GGUF"
+    gpu_layers: 0
+    ctx: 4096
+    temperature: 0.0
+    max_tokens: 512
+
+  # Compresses long tool output into small JSON for the planner.
+  extractor:
+    model: "LFM2-350M-Extract"
+    port: 8004
+    gguf: "LFM2-350M-Extract-Q8_0.gguf"
+    hf_repo: "LiquidAI/LFM2-350M-Extract-GGUF"
+    gpu_layers: 0
+    ctx: 8192
+    temperature: 0.0
+    max_tokens: 512

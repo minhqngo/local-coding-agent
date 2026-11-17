@@ -1,15 +1,11 @@
-"""Local multi-model coding agent.
+"""A small local coding agent, built to be read.
 
-Qwen writes the code; Liquid LFM2 models do everything around it — planning
-support, tool-call formatting, context compression, and repo Q&A.
-
-The public surface is intentionally small:
-
-    from coding_agent.config import load_config
-    from coding_agent.registry import ModelRegistry
-    from coding_agent.loop import AgentLoop
+Start with :mod:`coding_agent.single_model` (the whole agent idea in ~100
+lines), then :mod:`coding_agent.harness` (the rules around the model), then
+:mod:`coding_agent.loop` (the same thing with a team of specialist models).
+docs/how-it-works.md walks through all of it.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = ["__version__"]

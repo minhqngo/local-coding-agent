@@ -1,0 +1,71 @@
+# Profile: 12 GB GPU + 64 GB RAM, one big mixture-of-experts model.
+#
+# EXPERIMENTAL — picked from a model survey on 2026-11-17 (see
+# docs/running-locally.md#choosing-models). The GGUF file was verified on
+# Hugging Face; this profile has not been benchmarked on the target laptop yet.
+# First run:  coding-agent download --profile gpu-12gb-moe      (22 GB)
+#             coding-agent doctor   --profile gpu-12gb-moe
+#
+# Why this is different from the other profiles
+# ---------------------------------------------
+# Qwen3.6-35B-A3B has 35B parameters but only ~3B are active per token: each
+# layer has many "expert" FFNs and a router picks a few per token. The expert
+# weights are most of the file but are each touched rarely, so llama.cpp can
+# keep them in system RAM (`cpu_moe_layers`, i.e. --n-cpu-moe) while attention
+# runs on the GPU. You trade RAM (plenty here) for VRAM (scarce), and get a far
+# stronger model than any 3B dense one — reported SWE-bench Verified 73.4
+# (Qwen's own number, https://huggingface.co/Qwen/Qwen3.6-35B-A3B).
+#
+# Every role shares this one server: a single model is the simplest setup and
+# the strongest planner/coder available here. No LFM models, so no licensing
+# question on a work machine (Apache-2.0).
+#
+# Tuning: lower `cpu_moe_layers` until `coding-agent doctor` says it no longer
+# fits — more experts on the GPU = faster. Community reports for 12 GB cards
+# land around 22-24 (≈35-40 tok/s on an RTX 3060).
+
+defaults:
+  base_url_template: "http://127.0.0.1:{port}/v1"
+  timeout_s: 300
+  max_tokens: 2048
+
+server:
+  models_dir: "models"
+  host: "127.0.0.1"
+
+roles:
+  coder:
+    model: "Qwen3.6-35B-A3B"
+    port: 8002
+    gguf: "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
+    hf_repo: "unsloth/Qwen3.6-35B-A3B-GGUF"
+    gpu_layers: 99
+    cpu_moe_layers: 24
+    ctx: 32768
+    temperature: 0.2
+    max_tokens: 4096
+    thinking: false       # thinks by default; off keeps each step to seconds
+
+  planner:
+    share: coder
+    temperature: 0.6
+    thinking: false       # try true: better plans, several times slower
+    max_tokens: 1024
+
+  rag:
+    share: coder
+    temperature: 0.3
+    thinking: false
+    max_tokens: 1024
+
+  dispatcher:
+    share: coder
+    temperature: 0.0
+    thinking: false
+    max_tokens: 512
+
+  extractor:
+    share: coder
+    temperature: 0.0
+    thinking: false
+    max_tokens: 512
